@@ -1,16 +1,13 @@
 import { NON_DIMENSION_PROPS, NON_BUBBLING_EVENTS } from '../constants';
 import options from '../options';
 import { toLowerCase, isString, isFunction, hashToClassName } from '../util';
-
-
-
+import { ComponentNode } from '../component';
 
 /** Removes a given DOM Node from its parent. */
-export function removeNode(node) {
+export function removeNode(node: Node & ComponentNode) {
 	let p = node.parentNode;
 	if (p) p.removeChild(node);
 }
-
 
 /** Set a named attribute on the given Node, with special behavior for some names and event handlers.
  *	If `value` is `null`, the attribute/handler will be removed.
@@ -21,37 +18,34 @@ export function removeNode(node) {
  *	@param {Boolean} isSvg	Are we currently diffing inside an svg?
  *	@private
  */
-export function setAccessor(node, name, old, value, isSvg) {
+export function setAccessor(node: HTMLElement & { _listeners?: any }, name: string, old: any, value: any, isSvg: boolean) {
+	if (name === 'className') name = 'class';
 
-	if (name==='className') name = 'class';
-
-	if (name==='class' && value && typeof value==='object') {
+	if (name === 'class' && value && typeof value === 'object') {
 		value = hashToClassName(value);
 	}
 
-	if (name==='key') {
+	if (name === 'key') {
 		// ignore
-	}
-	else if (name==='class' && !isSvg) {
+	} else if (name === 'class' && !isSvg) {
 		node.className = value || '';
-	}
-	else if (name==='style') {
+	} else if (name === 'style') {
 		if (!value || isString(value) || isString(old)) {
 			node.style.cssText = value || '';
 		}
-		if (value && typeof value==='object') {
+
+		if (value && typeof value === 'object') {
 			if (!isString(old)) {
 				for (let i in old) if (!(i in value)) node.style[i] = '';
 			}
+
 			for (let i in value) {
 				node.style[i] = typeof value[i]==='number' && !NON_DIMENSION_PROPS[i] ? (value[i]+'px') : value[i];
 			}
 		}
-	}
-	else if (name==='dangerouslySetInnerHTML') {
+	} else if (name === 'dangerouslySetInnerHTML') {
 		node.innerHTML = value && value.__html || '';
-	}
-	else if (name[0]=='o' && name[1]=='n') {
+	} else if (name[0] == 'o' && name[1] == 'n') {
 		let l = node._listeners || (node._listeners = {});
 		name = toLowerCase(name.substring(2));
 		// @TODO: this might be worth it later, un-breaks focus/blur bubbling in IE9:
@@ -63,12 +57,10 @@ export function setAccessor(node, name, old, value, isSvg) {
 			node.removeEventListener(name, eventProxy, !!NON_BUBBLING_EVENTS[name]);
 		}
 		l[name] = value;
-	}
-	else if (name!=='list' && name!=='type' && !isSvg && name in node) {
+	} else if (name!=='list' && name!=='type' && !isSvg && name in node) {
 		setProperty(node, name, value==null ? '' : value);
 		if (value==null || value===false) node.removeAttribute(name);
-	}
-	else {
+	} else {
 		let ns = isSvg && name.match(/^xlink\:?(.+)/);
 		if (value==null || value===false) {
 			if (ns) node.removeAttributeNS('http://www.w3.org/1999/xlink', toLowerCase(ns[1]));
@@ -81,20 +73,18 @@ export function setAccessor(node, name, old, value, isSvg) {
 	}
 }
 
-
 /** Attempt to set a DOM property to the given value.
  *	IE & FF throw for certain property-value combinations.
  */
-function setProperty(node, name, value) {
+function setProperty<T>(node: HTMLElement, name: string, value: T) {
 	try {
 		node[name] = value;
 	} catch (e) { }
 }
 
-
 /** Proxy an event to hooked event handlers
  *	@private
  */
-function eventProxy(e) {
+function eventProxy(e: Event) {
 	return this._listeners[e.type](options.event && options.event(e) || e);
 }

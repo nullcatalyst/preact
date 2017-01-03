@@ -1,4 +1,5 @@
 import { diff } from './vdom/diff';
+import { VNode } from './vnode';
 
 /** Render JSX into a `parent` Element.
  *	@param {VNode} vnode		A (JSX) VNode to render
@@ -15,6 +16,6 @@ import { diff } from './vdom/diff';
  *	const Thing = ({ name }) => <span>{ name }</span>;
  *	render(<Thing name="one" />, document.querySelector('#foo'));
  */
-export function render(vnode, parent, merge) {
+export function render(vnode: VNode, parent: Element, merge: Element) {
 	return diff(merge, vnode, {}, false, parent);
 }

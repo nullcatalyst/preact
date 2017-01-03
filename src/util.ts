@@ -2,59 +2,57 @@
  *	@returns obj
  *	@private
  */
-export function extend(obj, props) {
+export function extend<T, U>(obj: T, props: U): T & U {
 	if (props) {
-		for (let i in props) obj[i] = props[i];
+		for (let i in props) (obj as any)[i] = props[i];
 	}
-	return obj;
-}
 
+	return obj as T & U;
+}
 
 /** Fast clone. Note: does not filter out non-own properties.
  *	@see https://esbench.com/bench/56baa34f45df6895002e03b6
  */
-export function clone(obj) {
+export function clone<T>(obj: T): T {
 	return extend({}, obj);
 }
-
 
 /** Get a deep property value from the given object, expressed in dot-notation.
  *	@private
  */
 export function delve(obj, key) {
-	for (let p=key.split('.'), i=0; i<p.length && obj; i++) {
+	for (let p = key.split('.'), i = 0; i < p.length && obj; i++) {
 		obj = obj[p[i]];
 	}
+
 	return obj;
 }
 
-
 /** @private is the given object a Function? */
-export function isFunction(obj) {
-	return 'function'===typeof obj;
+export function isFunction(obj: any): obj is Function {
+	return 'function' === typeof obj;
 }
-
 
 /** @private is the given object a String? */
-export function isString(obj) {
-	return 'string'===typeof obj;
+export function isString(obj: any): obj is string {
+	return 'string' === typeof obj;
 }
-
 
 /** Convert a hashmap of CSS classes to a space-delimited className string
  *	@private
  */
-export function hashToClassName(c) {
+export function hashToClassName(c: any): string {
 	let str = '';
+
 	for (let prop in c) {
 		if (c[prop]) {
 			if (str) str += ' ';
 			str += prop;
 		}
 	}
+
 	return str;
 }
-
 
 /** Just a memoized String#toLowerCase */
 let lcCache = {};
@@ -64,5 +62,5 @@ export const toLowerCase = s => lcCache[s] || (lcCache[s] = s.toLowerCase());
 /** Call a function asynchronously, as soon as possible.
  *	@param {Function} callback
  */
-let resolved = typeof Promise!=='undefined' && Promise.resolve();
+let resolved = typeof Promise !== 'undefined' && Promise.resolve();
 export const defer = resolved ? (f => { resolved.then(f); }) : setTimeout;

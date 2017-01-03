@@ -1,8 +1,22 @@
-import { FORCE_RENDER } from './constants';
+import { RENDER } from './constants';
 import { extend, clone, isFunction } from './util';
 import { createLinkedState } from './linked-state';
 import { renderComponent } from './vdom/component';
 import { enqueueRender } from './render-queue';
+
+export interface ComponentProps {
+	ref?: (component: Component<any, any, any>) => void;
+	key?: string | number;
+	children?: JSX.Element[];
+}
+
+export interface ComponentNode {
+	_listeners?: { [eventType: string]: (e: Event) => void };
+	_componentConstructor?: typeof Component;
+	_component?: Component<any, any, any>;
+	_parentComponent?: Component<any, any, any>;
+	normalizedNodeName?: string;
+}
 
 /** Base Component class, for the ES6 Class method of creating Components
  *	@public
@@ -14,36 +28,48 @@ import { enqueueRender } from './render-queue';
  *		}
  *	}
  */
-export function Component(props, context) {
-	/** @private */
-	this._dirty = true;
-	// /** @public */
-	// this._disableRendering = false;
-	// /** @public */
-	// this.prevState = this.prevProps = this.prevContext = this.base = this.nextBase = this._parentComponent = this._component = this.__ref = this.__key = this._linkedStates = this._renderCallbacks = null;
-	/** @public */
-	this.context = context;
-	/** @type {object} */
-	this.props = props;
-	/** @type {object} */
-	if (!this.state) this.state = {};
-}
+export class Component<Props, State, Context> {
+	// You should NOT touch any of the values starting with an underscore
+	_dirty?: boolean;
+	_linkedStates?: any;
+	_renderCallbacks?: (() => void)[];
+	_disable?: boolean;
+	_component?: Component<any, any, any>;
+	_parentComponent?: Component<any, any, any>;
+	__ref?: (component: this) => void;
+	__key?: string | number | undefined;
+	nextBase?: Element;
 
+	base?: Element | HTMLElement | SVGElement;
+	props: Props;
+	state: State;
+	context: Context;
 
-extend(Component.prototype, {
+	prevProps?: Props;
+	prevState?: State;
+	prevContext?: Context;
 
-	/** Returns a `boolean` value indicating if the component should re-render when receiving the given `props` and `state`.
-	 *	@param {object} nextProps
-	 *	@param {object} nextState
-	 *	@param {object} nextContext
-	 *	@returns {Boolean} should the component re-render
-	 *	@name shouldComponentUpdate
-	 *	@function
-	 */
-	// shouldComponentUpdate() {
-	// 	return true;
-	// },
+	constructor(props: Props, context?: Context) {
+		this._dirty = true;
+		this.context = context;
+		this.props = props;
 
+		if (!this.state) {
+			this.state = {} as State;
+		}
+	}
+
+	// Component Lifecycle
+	componentWillMount?(): void;
+	componentDidMount?(): void;
+	componentWillUnmount?(): void;
+	componentDidUnmount?(): void;
+	componentWillReceiveProps?(props: Props, context?: Context): void;
+	shouldComponentUpdate?(props: Props, state: State, context?: Context): boolean;
+	componentWillUpdate?(props: Props, state: State, context?: Context): void;
+	componentDidUpdate?(props: Props, state: State, context?: Context): void;
+
+	getChildContext?(): any;
 
 	/** Returns a function that sets a state property when called.
 	 *	Calling linkState() repeatedly with the same arguments returns a cached link function.
@@ -64,31 +90,32 @@ extend(Component.prototype, {
 	 *	@example Set a deep state value on click
 	 *		<button onClick={ this.linkState('touch.coords', 'touches.0') }>Tap</button
 	 */
-	linkState(key, eventPath) {
+	linkState(key: string, eventPath: string) {
 		let c = this._linkedStates || (this._linkedStates = {});
 		return c[key+eventPath] || (c[key+eventPath] = createLinkedState(this, key, eventPath));
-	},
-
+	}
 
 	/** Update component state by copying properties from `state` to `this.state`.
 	 *	@param {object} state		A hash of state properties to update with new values
 	 */
-	setState(state, callback) {
+	setState(state: Partial<State> | ((prevState: State, props: Props) => State), callback?: () => void) {
 		let s = this.state;
-		if (!this.prevState) this.prevState = clone(s);
+
+		if (!this.prevState) {
+			this.prevState = clone(s);
+		}
+
 		extend(s, isFunction(state) ? state(s, this.props) : state);
 		if (callback) (this._renderCallbacks = (this._renderCallbacks || [])).push(callback);
 		enqueueRender(this);
-	},
-
+	}
 
 	/** Immediately perform a synchronous re-render of the component.
 	 *	@private
 	 */
-	forceUpdate() {
-		renderComponent(this, FORCE_RENDER);
-	},
-
+	private forceUpdate() {
+		renderComponent(this, RENDER.FORCE);
+	}
 
 	/** Accepts `props` and `state`, and returns a new Virtual DOM tree to build.
 	 *	Virtual DOM is generally constructed via [JSX](http://jasonformat.com/wtf-is-jsx).
@@ -97,6 +124,5 @@ extend(Component.prototype, {
 	 *	@param {object} context		Context object (if a parent component has provided context)
 	 *	@returns VNode
 	 */
-	render() {}
-
-});
+	render(props: Props, state: State, context?: Context) {}
+}

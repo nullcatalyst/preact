@@ -1,4 +1,4 @@
-import { SYNC_RENDER, NO_RENDER, FORCE_RENDER, ASYNC_RENDER, ATTR_KEY } from '../constants';
+import { RENDER, ATTR_KEY } from '../constants';
 import options from '../options';
 import { isFunction, clone, extend } from '../util';
 import { enqueueRender } from '../render-queue';
@@ -8,6 +8,8 @@ import { isFunctionalComponent, buildFunctionalComponent } from './functional-co
 import { createComponent, collectComponent } from './component-recycler';
 import { removeNode } from '../dom/index';
 
+import { VNode } from '../vnode';
+import { ComponentNode, ComponentProps, Component } from '../component';
 
 
 /** Set a component's `props` (generally derived from JSX attributes).
@@ -16,7 +18,7 @@ import { removeNode } from '../dom/index';
  *	@param {boolean} [opts.renderSync=false]	If `true` and {@link options.syncComponentUpdates} is `true`, triggers synchronous rendering.
  *	@param {boolean} [opts.render=true]			If `false`, no render will be triggered.
  */
-export function setComponentProps(component, props, opts, context, mountAll) {
+export function setComponentProps<Props>(component: Component<Props, any, any>, props: Props & ComponentProps, opts: RENDER, context?: any, mountAll?: boolean) {
 	if (component._disable) return;
 	component._disable = true;
 
@@ -25,12 +27,11 @@ export function setComponentProps(component, props, opts, context, mountAll) {
 
 	if (!component.base || mountAll) {
 		if (component.componentWillMount) component.componentWillMount();
-	}
-	else if (component.componentWillReceiveProps) {
+	} else if (component.componentWillReceiveProps) {
 		component.componentWillReceiveProps(props, context);
 	}
 
-	if (context && context!==component.context) {
+	if (context && context !== component.context) {
 		if (!component.prevContext) component.prevContext = component.context;
 		component.context = context;
 	}
@@ -40,11 +41,10 @@ export function setComponentProps(component, props, opts, context, mountAll) {
 
 	component._disable = false;
 
-	if (opts!==NO_RENDER) {
-		if (opts===SYNC_RENDER || options.syncComponentUpdates!==false || !component.base) {
-			renderComponent(component, SYNC_RENDER, mountAll);
-		}
-		else {
+	if (opts !== RENDER.NO) {
+		if (opts === RENDER.SYNC || options.syncComponentUpdates !== false || !component.base) {
+			renderComponent(component, RENDER.SYNC, mountAll);
+		} else {
 			enqueueRender(component);
 		}
 	}
@@ -60,7 +60,7 @@ export function setComponentProps(component, props, opts, context, mountAll) {
  *	@param {boolean} [opts.build=false]		If `true`, component will build and store a DOM node if not already associated with one.
  *	@private
  */
-export function renderComponent(component, opts, mountAll, isChild) {
+export function renderComponent(component: Component<any, any, any>, opts?: RENDER, mountAll?: boolean, isChild?: boolean) {
 	if (component._disable) return;
 
 	let skip, rendered,
@@ -72,7 +72,7 @@ export function renderComponent(component, opts, mountAll, isChild) {
 		previousContext = component.prevContext || context,
 		isUpdate = component.base,
 		nextBase = component.nextBase,
-		initialBase = isUpdate || nextBase,
+		initialBase: Node & ComponentNode = isUpdate || nextBase,
 		initialChildComponent = component._component,
 		inst, cbase;
 
@@ -81,12 +81,11 @@ export function renderComponent(component, opts, mountAll, isChild) {
 		component.props = previousProps;
 		component.state = previousState;
 		component.context = previousContext;
-		if (opts!==FORCE_RENDER
+		if (opts !== RENDER.FORCE
 			&& component.shouldComponentUpdate
 			&& component.shouldComponentUpdate(props, state, context) === false) {
 			skip = true;
-		}
-		else if (component.componentWillUpdate) {
+		} else if (component.componentWillUpdate) {
 			component.componentWillUpdate(props, state, context);
 		}
 		component.props = props;
@@ -118,8 +117,8 @@ export function renderComponent(component, opts, mountAll, isChild) {
 			let childProps = getNodeProps(rendered);
 			inst = initialChildComponent;
 
-			if (inst && inst.constructor===childComponent && childProps.key==inst.__key) {
-				setComponentProps(inst, childProps, SYNC_RENDER, context);
+			if (inst && inst.constructor === childComponent && childProps.key == inst.__key) {
+				setComponentProps(inst, childProps, RENDER.SYNC, context);
 			}
 			else {
 				toUnmount = inst;
@@ -128,8 +127,8 @@ export function renderComponent(component, opts, mountAll, isChild) {
 				inst.nextBase = inst.nextBase || nextBase;
 				inst._parentComponent = component;
 				component._component = inst;
-				setComponentProps(inst, childProps, NO_RENDER, context);
-				renderComponent(inst, SYNC_RENDER, mountAll, true);
+				setComponentProps(inst, childProps, RENDER.NO, context);
+				renderComponent(inst, RENDER.SYNC, mountAll, true);
 			}
 
 			base = inst.base;
@@ -143,7 +142,7 @@ export function renderComponent(component, opts, mountAll, isChild) {
 				cbase = component._component = null;
 			}
 
-			if (initialBase || opts===SYNC_RENDER) {
+			if (initialBase || opts === RENDER.SYNC) {
 				if (cbase) cbase._component = null;
 				base = diff(cbase, rendered, context, mountAll || !isUpdate, initialBase && initialBase.parentNode, true);
 			}
@@ -169,7 +168,7 @@ export function renderComponent(component, opts, mountAll, isChild) {
 		if (base && !isChild) {
 			let componentRef = component,
 				t = component;
-			while ((t=t._parentComponent)) {
+			while ((t = t._parentComponent)) {
 				(componentRef = t).base = base;
 			}
 			base._component = componentRef;
@@ -179,11 +178,11 @@ export function renderComponent(component, opts, mountAll, isChild) {
 
 	if (!isUpdate || mountAll) {
 		mounts.unshift(component);
-	}
-	else if (!skip) {
+	} else if (!skip) {
 		if (component.componentDidUpdate) {
 			component.componentDidUpdate(previousProps, previousState, previousContext);
 		}
+
 		if (options.afterUpdate) options.afterUpdate(component);
 	}
 
@@ -193,41 +192,39 @@ export function renderComponent(component, opts, mountAll, isChild) {
 	if (!diffLevel && !isChild) flushMounts();
 }
 
-
-
 /** Apply the Component referenced by a VNode to the DOM.
  *	@param {Element} dom	The DOM node to mutate
  *	@param {VNode} vnode	A Component-referencing VNode
  *	@returns {Element} dom	The created/mutated element
  *	@private
  */
-export function buildComponentFromVNode(dom, vnode, context, mountAll) {
+export function buildComponentFromVNode(dom: Node & ComponentNode, vnode: VNode, context: any, mountAll) {
 	let c = dom && dom._component,
 		oldDom = dom,
-		isDirectOwner = c && dom._componentConstructor===vnode.nodeName,
+		isDirectOwner = c && dom._componentConstructor === vnode.nodeName,
 		isOwner = isDirectOwner,
 		props = getNodeProps(vnode);
-	while (c && !isOwner && (c=c._parentComponent)) {
-		isOwner = c.constructor===vnode.nodeName;
+
+	while (c && !isOwner && (c = c._parentComponent)) {
+		isOwner = c.constructor === vnode.nodeName;
 	}
 
 	if (c && isOwner && (!mountAll || c._component)) {
-		setComponentProps(c, props, ASYNC_RENDER, context, mountAll);
+		setComponentProps(c, props, RENDER.ASYNC, context, mountAll);
 		dom = c.base;
-	}
-	else {
+	} else {
 		if (c && !isDirectOwner) {
 			unmountComponent(c, true);
 			dom = oldDom = null;
 		}
 
-		c = createComponent(vnode.nodeName, props, context);
+		c = createComponent(vnode.nodeName as typeof Component, props, context);
 		if (dom && !c.nextBase) {
-			c.nextBase = dom;
+			c.nextBase = dom as Element;
 			// passing dom/oldDom as nextBase will recycle it if unused, so bypass recycling on L241:
 			oldDom = null;
 		}
-		setComponentProps(c, props, SYNC_RENDER, context, mountAll);
+		setComponentProps(c, props, RENDER.SYNC, context, mountAll);
 		dom = c.base;
 
 		if (oldDom && dom!==oldDom) {
@@ -239,14 +236,12 @@ export function buildComponentFromVNode(dom, vnode, context, mountAll) {
 	return dom;
 }
 
-
-
 /** Remove a component from the DOM and recycle it.
  *	@param {Element} dom			A DOM node from which to unmount the given Component
  *	@param {Component} component	The Component instance to unmount
  *	@private
  */
-export function unmountComponent(component, remove) {
+export function unmountComponent(component: Component<any, any, any>, remove?: boolean) {
 	if (options.beforeUnmount) options.beforeUnmount(component);
 
 	// console.log(`${remove?'Removing':'Unmounting'} component: ${component.constructor.name}`);
@@ -272,6 +267,7 @@ export function unmountComponent(component, remove) {
 			removeNode(base);
 			collectComponent(component);
 		}
+
 		let c;
 		while ((c=base.lastChild)) recollectNodeTree(c, !remove);
 		// removeOrphanedChildren(base.childNodes, true);

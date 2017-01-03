@@ -1,4 +1,5 @@
 import { isString, delve } from './util';
+import { Component } from './component';
 
 /** Create an Event handler function that sets a given state property.
  *	@param {Component} component	The component whose state should be updated
@@ -7,17 +8,20 @@ import { isString, delve } from './util';
  *	@returns {function} linkedStateHandler
  *	@private
  */
-export function createLinkedState(component, key, eventPath) {
+export function createLinkedState(component: Component<any, any, any>, key: string, eventPath: string) {
 	let path = key.split('.');
-	return function(e) {
+
+	return function (e: Event) {
 		let t = e && e.target || this,
 			state = {},
 			obj = state,
 			v = isString(eventPath) ? delve(e, eventPath) : t.nodeName ? (t.type.match(/^che|rad/) ? t.checked : t.value) : e,
 			i = 0;
+
 		for ( ; i<path.length-1; i++) {
 			obj = obj[path[i]] || (obj[path[i]] = !i && component.state[path[i]] || {});
 		}
+
 		obj[path[i]] = v;
 		component.setState(state);
 	};

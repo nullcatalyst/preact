@@ -8,9 +8,12 @@ import { createNode, collectNode } from '../dom/recycler';
 import { unmountComponent } from './component';
 import options from '../options';
 
+import { VNode } from '../vnode';
+import { Component } from '../component';
+
 
 /** Queue of components that have been mounted and are awaiting componentDidMount */
-export const mounts = [];
+export const mounts: Component<any, any, any>[] = [];
 
 /** Diff recursion count, used to track the end of the diff cycle. */
 export let diffLevel = 0;
@@ -25,7 +28,7 @@ let hydrating = false;
 /** Invoke queued componentDidMount lifecycle methods */
 export function flushMounts() {
 	let c;
-	while ((c=mounts.pop())) {
+	while ((c = mounts.pop())) {
 		if (options.afterMount) options.afterMount(c);
 		if (c.componentDidMount) c.componentDidMount();
 	}
@@ -38,7 +41,7 @@ export function flushMounts() {
  *	@returns {Element} dom			The created/mutated element
  *	@private
  */
-export function diff(dom, vnode, context, mountAll, parent, componentRoot) {
+export function diff(dom: Node, vnode: VNode | string, context: any, mountAll?: boolean, parent?: Node, componentRoot?: true) {
 	// diffLevel having been 0 here indicates initial entry into the diff (not a subdiff)
 	if (!diffLevel++) {
 		// when first starting the diff, check if we're diffing an SVG or within an SVG
@@ -51,7 +54,7 @@ export function diff(dom, vnode, context, mountAll, parent, componentRoot) {
 	let ret = idiff(dom, vnode, context, mountAll);
 
 	// append the element if its a new parent
-	if (parent && ret.parentNode!==parent) parent.appendChild(ret);
+	if (parent && ret.parentNode !== parent) parent.appendChild(ret);
 
 	// diffLevel being reduced to 0 means we're exiting the diff
 	if (!--diffLevel) {
@@ -64,19 +67,16 @@ export function diff(dom, vnode, context, mountAll, parent, componentRoot) {
 }
 
 
-function idiff(dom, vnode, context, mountAll) {
-	let originalAttributes = vnode && vnode.attributes;
-
+function idiff(dom: Node | null, vnode: VNode | string | null, context: any, mountAll?: boolean) {
+	let originalAttributes = vnode && (vnode as VNode).attributes;
 
 	// Resolve ephemeral Pure Functional Components
 	while (isFunctionalComponent(vnode)) {
 		vnode = buildFunctionalComponent(vnode, context);
 	}
 
-
 	// empty values (null & undefined) render as empty Text nodes
-	if (vnode==null) vnode = '';
-
+	if (vnode == null) vnode = '';
 
 	// Fast case: Strings create/update Text nodes.
 	if (isString(vnode)) {
@@ -97,14 +97,12 @@ function idiff(dom, vnode, context, mountAll) {
 		return dom;
 	}
 
-
 	// If the VNode represents a Component, perform a component diff.
 	if (isFunction(vnode.nodeName)) {
 		return buildComponentFromVNode(dom, vnode, context, mountAll);
 	}
 
-
-	let out = dom,
+	let out: Node = dom,
 		nodeName = String(vnode.nodeName),	// @TODO this masks undefined component errors as `<undefined>`
 		prevSvgMode = isSvgMode,
 		vchildren = vnode.children;
@@ -119,8 +117,7 @@ function idiff(dom, vnode, context, mountAll) {
 		// case: we had no element to begin with
 		// - create an element with the nodeName from VNode
 		out = createNode(nodeName, isSvgMode);
-	}
-	else if (!isNamedNode(dom, nodeName)) {
+	} else if (!isNamedNode(dom, nodeName)) {
 		// case: Element and VNode had different nodeNames
 		// - need to create the correct Element to match VNode
 		// - then migrate children from old to new
@@ -153,9 +150,9 @@ function idiff(dom, vnode, context, mountAll) {
 
 
 	// Optimization: fast-path for elements containing a single TextNode:
-	if (!hydrating && vchildren && vchildren.length===1 && typeof vchildren[0]==='string' && fc && fc instanceof Text && !fc.nextSibling) {
-		if (fc.nodeValue!=vchildren[0]) {
-			fc.nodeValue = vchildren[0];
+	if (!hydrating && vchildren && vchildren.length === 1 && typeof vchildren[0] === 'string' && fc && fc instanceof Text && !fc.nextSibling) {
+		if (fc.nodeValue != vchildren[0]) {
+			fc.nodeValue = vchildren[0] as string;
 		}
 	}
 	// otherwise, if there are existing or new children, diff them:
@@ -165,8 +162,8 @@ function idiff(dom, vnode, context, mountAll) {
 
 
 	// invoke original ref (from before resolving Pure Functional Components):
-	if (originalAttributes && typeof originalAttributes.ref==='function') {
-		(props.ref = originalAttributes.ref)(out);
+	if (originalAttributes && typeof originalAttributes['ref'] === 'function') {
+		(props.ref = originalAttributes['ref'])(out);
 	}
 
 	isSvgMode = prevSvgMode;
@@ -274,13 +271,12 @@ function innerDiffNode(dom, vchildren, context, mountAll) {
  *	@param {Node} node						DOM node to start unmount/removal from
  *	@param {Boolean} [unmountOnly=false]	If `true`, only triggers unmount lifecycle, skips removal
  */
-export function recollectNodeTree(node, unmountOnly) {
+export function recollectNodeTree(node: Node & { _component?: Component<any, any, any> }, unmountOnly: boolean = false) {
 	let component = node._component;
 	if (component) {
 		// if node is owned by a Component, unmount that component (ends up recursing back here)
 		unmountComponent(component, !unmountOnly);
-	}
-	else {
+	} else {
 		// If the node's VNode had a ref function, invoke it with null here.
 		// (this is part of the React spec, and smart for unsetting references)
 		if (node[ATTR_KEY] && node[ATTR_KEY].ref) node[ATTR_KEY].ref(null);

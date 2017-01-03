@@ -1,9 +1,8 @@
 import { VNode } from './vnode';
+import { Component, ComponentProps } from './component';
 import options from './options';
 
-
 const stack = [];
-
 
 /** JSX/hyperscript reviver
 *	Benchmarks: https://esbench.com/bench/57ee8f8e330ab09900a1a1a0
@@ -14,27 +13,31 @@ const stack = [];
  *  import { render, h } from 'preact';
  *  render(<span>foo</span>, document.body);
  */
-export function h(nodeName, attributes) {
+export function h<Props>(nodeName: string | typeof Component, attributes: Props & ComponentProps, ...children: any[]);
+export function h<Props>(nodeName: string | typeof Component, attributes: Props & ComponentProps) {
 	let children = [],
 		lastSimple, child, simple, i;
+
 	for (i=arguments.length; i-- > 2; ) {
 		stack.push(arguments[i]);
 	}
+
 	if (attributes && attributes.children) {
 		if (!stack.length) stack.push(attributes.children);
 		delete attributes.children;
 	}
+
 	while (stack.length) {
 		if ((child = stack.pop()) instanceof Array) {
-			for (i=child.length; i--; ) stack.push(child[i]);
-		}
-		else if (child!=null && child!==true && child!==false) {
-			if (typeof child=='number') child = String(child);
-			simple = typeof child=='string';
+			for (i = child.length; i--; ) stack.push(child[i]);
+		} else if (child != null && child !== true && child!==false) {
+			if (typeof child === 'number') child = String(child);
+
+			simple = typeof child === 'string';
+
 			if (simple && lastSimple) {
 				children[children.length-1] += child;
-			}
-			else {
+			} else {
 				children.push(child);
 				lastSimple = simple;
 			}

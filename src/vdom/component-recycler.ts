@@ -15,10 +15,12 @@ export function collectComponent(component) {
 }
 
 
-export function createComponent(Ctor, props, context) {
+export function createComponent<Props, Context>(Ctor: typeof Component, props: Props, context?: Context) {
 	let inst = new Ctor(props, context),
 		list = components[Ctor.name];
+
 	Component.call(inst, props, context);
+
 	if (list) {
 		for (let i=list.length; i--; ) {
 			if (list[i].constructor===Ctor) {
@@ -28,5 +30,6 @@ export function createComponent(Ctor, props, context) {
 			}
 		}
 	}
+
 	return inst;
 }

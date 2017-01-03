@@ -1,3 +1,6 @@
+import { VNode } from './vnode';
+import { Component } from './component';
+
 /** Global options
  *	@public
  *	@namespace options {Object}
@@ -24,4 +27,15 @@ export default {
 
 	/** Hook invoked immediately before a component is unmounted. */
 	// beforeUnmount(component) { }
-};
+} as Options;
+
+interface Options {
+	syncComponentUpdates?: boolean;
+
+	vnode?(vnode: VNode): void;
+	debounceRendering?(rerender: () => void): void;
+	event?(e: Event): Event | undefined;
+	afterMount?(component: Component<any, any, any>): void;
+	afterUpdate?(component: Component<any, any, any>): void;
+	beforeUnmount?(component: Component<any, any, any>): void;
+}
